@@ -1,0 +1,45 @@
+{
+	"history": [
+		"0.0",
+		"0.1",
+		"0.1baf",
+		"0.2",
+		"0.3",
+		"0.4"
+	],
+	"versions": {
+		"0.4": {
+			"time": 1675400000,
+			"changes": [
+				"Destroyed some hardware."
+			]
+		},
+		"0.3": {
+			"time": 1675300000,
+			"changes": [
+				"Implemented some more stuff again.",
+				"Added five new secret bugs."
+			]
+		},
+		"0.2": {
+			"time": 1675200000,
+			"changes": [
+				"Implemented some more stuff.",
+				"Removed some stuff."
+			]
+		},
+		"0.1": {
+			"time": 1675100000,
+			"changes": [
+				"Fixed some stuff.",
+				"Broke some stuff."
+			]
+		},
+		"0.0AAA": {
+			"time": 1675000000,
+			"changes": [
+				"Implemented some stuff."
+			]
+		}
+	}
+}

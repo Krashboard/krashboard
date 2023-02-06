@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+	<!--
+		External API:
+		This page should be accessed with a query string where `?checkClientVersion=` is set to a URI-encoded version string.
+
+		Valid version strings are listed with metadata in ../VERSIONS.json, but this page should gracefully handle invalid version strings as well.
+
+		See UpdateCheckerWindow.qml for the client side.
+	-->
+	<head>
+		<!--<link href="../VERSIONS.json" rel="preload" as="fetch" crossorigin="anonymous">-->
+		<!-- I think this causes stale cache hits. -->
+		<link rel="icon" type="image/png" href="../favicon.png">
+		<meta charset="UTF-8">
+		<title>Krashboard Update Checker</title>
+		<style>
+			body, html {
+				width: 100%;
+				height: 100%;
+				margin: 0;
+				padding: 0;
+			}
+			body {
+				display: flex;
+				font-family: sans-serif;
+			}
+
+			body.update_error {
+				/*background: crimson;*/
+				background: grey;
+			}
+			body.update_unknown {
+				background: gainsboro;
+			}
+			body.update_uptodate {
+				background: #7CCB59;
+			}
+			/* Hex codes from OfficialIcon.blend (with no colour space conversion). */
+			body.update_outdated {
+				/*background: #F3BC59;*/
+				/* The yellow's a bit agressive, honestly. */
+				background: whitesmoke;
+			}
+
+			#wrapper {
+				padding-left: 15%;
+				padding-right: 15%;
+				text-align: center;
+				margin: auto;
+			}
+
+			.val_clientversion, .val_latestversion {
+				/*font-weight: bold;*/
+				text-decoration: underline;
+			}
+
+			#errorlog {
+				display: none;
+			}
+			body.update_error #errorlog {
+				display: unset;
+			}
+			.result_msg {
+				display: none;
+			}
+			.result_msg h1, h1.result_msg {
+				text-decoration: underline;
+			}
+			body.update_unknown .result_msg.update_unknown {
+				display: unset;
+			}
+			body.update_uptodate .result_msg.update_uptodate {
+				display: unset;
+			}
+			body.update_outdated .result_msg.update_outdated {
+				display: unset;
+			}
+
+			.collapsible.collapsible_ishidden .collapsible_hidebutton {
+				display: none;
+			}
+
+			.collapsible.collapsible_ishidden .collapsible_contents {
+				display: none;
+			}
+
+			.collapsible:not(.collapsible_ishidden) .collapsible_showbutton {
+				display: none;
+			}
+
+			ul.dchangelog_versionchanges {
+				list-style-type: none;
+				padding: 0;
+				margin: 0;
+			}
+		</style>
+		<template id="dchangelog_versionsection_template">
+			<b class="dchangelog_versionheading"></b>
+			<ul class="dchangelog_versionchanges">
+			</ul>
+		</template>
+		<template id="dchangelog_changeitem_template">
+			<li class="dchangelog_changeitem"></li>
+		</template>
+		<script>
+			function makeChangelogItem(text) {
+				let e = document.querySelector('#dchangelog_changeitem_template').content.cloneNode(true).querySelector('.dchangelog_changeitem')
+				e.innerText = text
+				return e
+			}
+			function makeChangelogVersionSection(versiontext, changes) {
+				let df = document.querySelector('#dchangelog_versionsection_template').content.cloneNode(true)
+				let eheading = df.querySelector('.dchangelog_versionheading')
+				let elist = df.querySelector('.dchangelog_versionchanges')
+				eheading.innerText = versiontext
+				for (let text of changes) {
+					elist.appendChild(makeChangelogItem(text))
+				}
+				return df
+			}
+		</script>
+	</head>
+	<body class="update_unknown">
+		<div id="wrapper">
+			<h1 id="errorlog"></h1>
+			<p>Your Krashboard version is <span class="val_clientversion">UNKNOWN</span>, released <span class="val_clientversion_date">UNKNOWN</span>.</p>
+			<p>The latest version is <span class="val_latestversion">UNKNOWN</span>, released <span class="val_latestversion_date">UNKNOWN</span>.</p>
+			<h1 class="result_msg update_unknown">Your Krashboard version may or may not be out of date.</h1>
+			<h1 class="result_msg update_uptodate">Your Krashboard version is up to date! 👍</h1>
+			<div class="result_msg update_outdated">
+				<h1>Your Krashboard version may not be up to date.</h1>
+				<p>Consider updating your system software, or using one of the official builds.</p>
+				<!-- No point in linking to any kind of download page since I don't want to implement QTWebEngine's onNewViewRequested() and such anyway. -->
+				<div id="dchangelog" class="collapsible collapsible_ishidden">
+					<button class="collapsible_showbutton" onclick="document.querySelector('#dchangelog').classList.remove('collapsible_ishidden')">
+						Show changes since <span class="val_clientversion">CURRENT VERSION</span>
+					</button>
+					<button class="collapsible_hidebutton" onclick="document.querySelector('#dchangelog').classList.add('collapsible_ishidden')">
+						Hide changes since <span class="val_clientversion">CURRENT VERSION</span>
+					</button>
+					<div id="dchangelog_contents" class="collapsible_contents">
+						UNKNOWN CHANGES.
+					</div>
+				</div>
+			</div>
+		</div>
+		<script>
+			async function fetchJson(url) {
+				console.log(`Downloading JSON ${url}.`)
+				let response = await window.fetch(url, {cache: 'reload'})
+				console.log(`Decoding JSON ${url}.`)
+				return await response.json()
+			}
+
+			function reportError(msg) {
+				let error_text = `ERROR: ${msg}`
+				console.error(error_text)
+				document.querySelector('#errorlog').innerHTML += error_text + '<br>'
+				document.body.className = 'update_error'
+				window.setTimeout(() => window.alert(error_text), 100)
+				// .requestAnimationFrame() and .setTimeout() with lower delay don't let the background update first.
+			}
+
+			function getDateStringForVersion(versionstring, versions_info) {
+				let v_info = versions_info?.versions[versionstring]
+				return (v_info && v_info.hasOwnProperty('time')) ?
+					new Date(v_info.time * 1000).toLocaleDateString() :
+					null
+			}
+
+			function setInnerTexts(elements, text) {
+				for (let e of elements) {
+					e.innerText = text
+				}
+			}
+
+			function setPage(client_version, versions_info) {
+
+				let latestVersion = versions_info.history[versions_info.history.length - 1]
+
+				if (latestVersion == client_version) {
+					// Up to date.
+					console.log("Up to date.")
+					document.body.className = 'update_uptodate'
+				} else {
+					// May not be up to date.
+					console.log("Outdated.")
+					document.body.className = 'update_outdated'
+				}
+
+				setInnerTexts(
+					document.querySelectorAll('.val_latestversion'),
+					latestVersion
+				)
+				setInnerTexts(
+					document.querySelectorAll('.val_clientversion'),
+					client_version
+				)
+
+				setInnerTexts(
+					document.querySelectorAll('.val_latestversion_date'),
+					getDateStringForVersion(latestVersion, versions_info) ?? "UNKNOWN"
+				)
+				setInnerTexts(
+					document.querySelectorAll('.val_clientversion_date'),
+					getDateStringForVersion(client_version, versions_info) ?? "UNKNOWN"
+				)
+
+				let df = document.createDocumentFragment()
+				for (let version of versions_info.history.slice().reverse()) {
+					if (version === client_version) {
+						break
+						// If client version is unknown/invalid, full changelog is shown.
+					}
+					df.appendChild(makeChangelogVersionSection(
+						version,
+						versions_info.versions.hasOwnProperty(version) ?
+							versions_info.versions[version].changes ?? [] :
+							[]
+					))
+				}
+				let e = document.querySelector('#dchangelog_contents')
+				e.innerHTML = ''
+				e.appendChild(df)
+			}
+
+			async function main() {
+				try {
+					window.VERSIONS = await fetchJson('../VERSIONS.json')
+					window.checkClientVersion = window.decodeURIComponent(new URLSearchParams(window.location.search).get('checkClientVersion') ?? "UNKNOWN")
+					setPage(
+						window.checkClientVersion,
+						window.VERSIONS
+					)
+				} catch (e) {
+					reportError(e)
+					return
+				}
+			}
+
+			main()
+
+		</script>
+	</body>
+</html>
